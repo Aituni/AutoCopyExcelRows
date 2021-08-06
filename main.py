@@ -11,7 +11,7 @@ filled_dir = "./Rellenados/"
 
 saltar = 4
 index_n_columns = 2
-data_n_columns = 6
+data_n_columns = 8
 
 def get_pendientes(file_df, pendiente_df = None, update=False):
     # get filas pendientes por rellenar
@@ -25,67 +25,64 @@ def get_pendientes(file_df, pendiente_df = None, update=False):
     
     return pendiente_df
 
-def rellenar_excels(titulos_de_interes, titutlos, db_path):
+def rellenar_excels(titulos_de_interes, titulos, db_path):
     if not os.path.exists(db_path):
         print("Error: Falta la base de datos!")
         return 1
     if not os.path.exists(filled_dir):
         os.makedirs(filled_dir)
-    
-    atomic_idx = titulos_de_interes[:index_n_columns]
         
     db_df = pd.read_excel(db_path)
-    db_df.set_index(atomic_idx, inplace=True)
+    idx_tit = titulos_de_interes[:index_n_columns]
+    short_db = db_df[idx_tit]
     for file_path in tqdm(archivos):
         file_df = pd.read_excel(file_path)
-        file_df.set_index(atomic_idx, inplace=True)
-        
         pendiente_df = get_pendientes(file_df)
-        for index in pendiente_df.index:
-            if index in db_df.index:  
+
+        for index, row in pendiente_df.iterrows():
+            lista_busqueda = short_db.isin(list(row[idx_tit])).all(1)
+            if lista_busqueda.any():
+                for i, b in enumerate(lista_busqueda):
+                    if b:
+                        fila_db = db_df.iloc[i]
+                        break
                 for title in titulos_de_interes[index_n_columns:]:
-                    file_df.loc[index, title] = db_df.loc[index, title]
+                    file_df.loc[index, title] = fila_db[[title]].values
         
         filename = file_path.split("/")[-1].split('\\')[-1]
-        file_df.reset_index(inplace=True)
         file_df = file_df[titulos]        
-        file_df.to_excel(filled_dir + filename, index=False, merge_cells=False)
+        file_df.sort_index().to_excel(filled_dir + filename, index=False, merge_cells=False)
 
-def clean_db(db_path):
+def clean_db(db_path, titulos_de_interes):
     #quita de pendientes aquellas lineas que hayan entrado en la base de datos más adelante
     if not os.path.exists(db_path):
         print("Error: Falta la base de datos!")
         return 1
-    atomic_idx = titulos_de_interes[:index_n_columns]
 
     db_df = pd.read_excel(db_path)
     pendiente_df = pd.read_excel(empty_db_path)
-    db_df.set_index(atomic_idx, inplace=True)
-    pendiente_df.set_index(atomic_idx, inplace=True)
+    idx_tit = titulos_de_interes[:index_n_columns]
+    short_db = db_df[idx_tit]
 
     fp_index = []
     for index, row in pendiente_df.iterrows():
-        if index in db_df.index:
+        if short_db.isin(list(row[idx_tit])).all(1).any():
             fp_index.append(index)
     if fp_index:
         pendiente_df.drop(fp_index, inplace = True)
 
-    pendiente_df.to_excel(empty_db_path, merge_cells=False)    
+    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False)    
 
 def generar_db(titulos_de_interes, titulos):
 
     #crear df del db y poner headers
     db_df = pd.DataFrame(columns=titulos_de_interes)
-    db_df.set_index(titulos_de_interes[:index_n_columns], inplace=True)
-
     pendiente_df = pd.DataFrame(columns=titulos_de_interes)
-    pendiente_df.set_index(titulos_de_interes[:index_n_columns], inplace=True)
 
     for file_path in tqdm(archivos):
         file_df = pd.read_excel(file_path)
 
         file_df = file_df[titulos_de_interes] # solo datos de interes
-        file_df.set_index(titulos_de_interes[:index_n_columns], inplace=True)
 
         pendiente_df = get_pendientes(file_df, pendiente_df, True)
         
@@ -95,9 +92,11 @@ def generar_db(titulos_de_interes, titulos):
         uncmplt_row_index = uncmplt_row_index.append(uncmplt_row_index2)
         file_df.drop(uncmplt_row_index, inplace = True)
         db_df = pd.concat([db_df, file_df]).drop_duplicates()
+        db_df = db_df[~db_df.index.duplicated(keep='first')]
 
-    db_df.to_excel(db_path, merge_cells=False)
-    pendiente_df.to_excel(empty_db_path, merge_cells=False)
+
+    db_df.sort_index().to_excel(db_path, merge_cells=False, index=False)
+    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False)
 
 def get_titles():
     if not archivos:
@@ -121,7 +120,8 @@ if os.path.exists(archivos_dir):
         else:
             print("\n Generando base de datos ...\n", flush=True)
             generar_db(titulos_de_interes, titulos)
-            clean_db(db_path)
+            print("\n Limpiando base de datos PENDIENTE ...", flush=True)
+            clean_db(db_path, titulos_de_interes)
             print("\n Rellenando excels ...\n", flush=True)
             rellenar_excels(titulos_de_interes, titulos, db_path)
 
