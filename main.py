@@ -9,9 +9,9 @@ empty_db_path = "./base de datos PENDIENTES.xlsx"
 archivos_dir = "./Archivos/"
 filled_dir = "./Rellenados/"
 
-saltar = 4
-index_n_columns = 2
-data_n_columns = 8
+saltar = 4 # salta las primeras x
+index_n_columns = 2 # first n index
+data_n_columns = 8 # next k columns for data to take into account
 
 def get_pendientes(file_df, pendiente_df = None, update=False):
     # get filas pendientes por rellenar
@@ -49,9 +49,10 @@ def rellenar_excels(titulos_de_interes, titulos, db_path):
                 for title in titulos_de_interes[index_n_columns:]:
                     file_df.loc[index, title] = fila_db[[title]].values
         
-        filename = file_path.split("/")[-1].split('\\')[-1]
+        filename = os.path.basename(file_path)
+        filename, extension = os.path.splitext(filename)
         file_df = file_df[titulos]        
-        file_df.sort_index().to_excel(filled_dir + filename, index=False, merge_cells=False)
+        file_df.sort_index().to_excel(filled_dir + filename + extension.lower(), index=False, merge_cells=False, engine='openpyxl')
 
 def clean_db(db_path, titulos_de_interes):
     #quita de pendientes aquellas lineas que hayan entrado en la base de datos más adelante
@@ -71,7 +72,7 @@ def clean_db(db_path, titulos_de_interes):
     if fp_index:
         pendiente_df.drop(fp_index, inplace = True)
 
-    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False)    
+    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False, engine='openpyxl')    
 
 def generar_db(titulos_de_interes, titulos):
 
@@ -95,8 +96,8 @@ def generar_db(titulos_de_interes, titulos):
         db_df = db_df[~db_df.index.duplicated(keep='first')]
 
 
-    db_df.sort_index().to_excel(db_path, merge_cells=False, index=False)
-    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False)
+    db_df.sort_index().to_excel(db_path, merge_cells=False, index=False, engine='openpyxl')
+    pendiente_df.sort_index().to_excel(empty_db_path, merge_cells=False, index=False, engine='openpyxl')
 
 def get_titles():
     if not archivos:
@@ -104,7 +105,7 @@ def get_titles():
         return 1,1
         
     file_df = pd.read_excel(archivos[0])
-    titulos = list(file_df.columns)
+    titulos = list(file_df.columns)# todos los titulos
     titulos_de_interes = list(titulos[ saltar : saltar + index_n_columns + data_n_columns])
 
     return titulos_de_interes, titulos

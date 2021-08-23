@@ -7,6 +7,7 @@ Antes de usarlo abre el terminal y ejecuta cada uno de estos comandos: (es para 
 "pip install tqdm"
 "pip install pandas"
 "pip install xlrd"
+"pip install openpyxl"
 
 
 Para usar el programa tienes que abrir el terminal en la dirección o carpeta en la que esté el archivo ejecutable "main.py".
